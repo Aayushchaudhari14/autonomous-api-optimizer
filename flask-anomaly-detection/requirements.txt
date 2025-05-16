@@ -1,0 +1,8 @@
+flask==2.3.3
+numpy==1.26.4
+scikit-learn==1.5.1
+pandas==2.2.2
+requests==2.31.0
+prometheus-client==0.20.0
+gunicorn==20.1.0
+# Add other dependencies you're using here
