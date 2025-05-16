@@ -1,8 +1,23 @@
 global:
   scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'alertmanager:9093'
 
 scrape_configs:
-  - job_name: 'autonomous-api-optimizer'
-    metrics_path: '/actuator/prometheus'        # <--- Important!
+  - job_name: 'spring-boot'
+    metrics_path: '/actuator/prometheus'
     static_configs:
       - targets: ['api-service:8080']
+
+  - job_name: 'flask-anomaly-detection'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['flask-anomaly-detection:5000']
+
+rule_files:
+  - '/etc/prometheus/alerts.yml'
