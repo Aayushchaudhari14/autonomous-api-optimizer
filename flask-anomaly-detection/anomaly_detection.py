@@ -22,12 +22,13 @@ def fetch_prometheus_metrics():
     try:
         url = "http://prometheus:9090/api/v1/query"
         queries = {
-            'latency': 'avg(rate(http_request_duration_seconds_sum[5m])/rate(http_request_duration_seconds_count[5m]))*1000',
-            'throughput': 'rate(http_requests_total[5m])',
-            'error_rate': 'rate(http_requests_total{status=~"5.."}[5m])/rate(http_requests_total[5m])*100',
-            'cpu_usage': 'rate(jvm_cpu_seconds_total[5m])*100',
-            'queue_length': 'sum(spring_task_executor_queue_size)'  # Example for queue length
+        'latency': 'avg(rate(http_server_requests_seconds_sum[5m]) / rate(http_server_requests_seconds_count[5m])) * 1000',
+        'throughput': 'rate(http_server_requests_seconds_count[5m])',
+        'error_rate': 'rate(http_server_requests_seconds_count{status=~"5.."}[5m]) / rate(http_server_requests_seconds_count[5m]) * 100',
+        'cpu_usage': 'process_cpu_usage * 100',
+        'queue_length': 'executor_queue_remaining_tasks'
         }
+
         metrics = {}
         for key, query in queries.items():
             response = requests.get(url, params={'query': query}, timeout=5)
@@ -154,7 +155,7 @@ def detect_anomaly():
             anomaly_counter.inc()
 
         response = {
-            'is_anomaly': is_anomaly,
+            'is_anomaly': bool(is_anomaly),
             'reason': reason,
             'metrics': metrics,
             'timestamp': datetime.now().isoformat()
