@@ -28,31 +28,84 @@
 groups:
   - name: anomaly_alerts
     rules:
-      - alert: HighLatency
-        expr: avg(rate(http_server_requests_seconds_sum{uri=~"/api/.*"}[5m]) 
-              / rate(http_server_requests_seconds_count{uri=~"/api/.*"}[5m])) * 1000 > 100
+      # Latency Alerts for /api/hello
+      - alert: HighLatency_Hello
+        expr: avg(rate(http_server_requests_seconds_sum{uri="/api/hello"}[5m]) 
+              / rate(http_server_requests_seconds_count{uri="/api/hello"}[5m])) * 1000 > 100
         for: 2m
         labels:
           severity: warning
+          endpoint: hello
         annotations:
-          summary: "High latency detected"
-          description: "Average latency {{ $value }} ms exceeds 100 ms for 2 minutes."
+          summary: "High latency on /api/hello"
+          description: "Average latency {{ $value }} ms exceeds 100 ms for 2 minutes on /api/hello."
 
-      - alert: HighErrorRate
-        expr: rate(http_server_requests_seconds_count{status=~"5..", uri=~"/api/.*"}[5m]) 
-              / rate(http_server_requests_seconds_count{uri=~"/api/.*"}[5m]) * 100 > 5
+      # Latency Alerts for /api/update
+      - alert: HighLatency_Update
+        expr: avg(rate(http_server_requests_seconds_sum{uri="/api/update"}[5m]) 
+              / rate(http_server_requests_seconds_count{uri="/api/update"}[5m])) * 1000 > 100
         for: 2m
         labels:
           severity: warning
+          endpoint: update
         annotations:
-          summary: "High error rate detected"
-          description: "Error rate {{ $value }}% exceeds 5% for 2 minutes."
+          summary: "High latency on /api/update"
+          description: "Average latency {{ $value }} ms exceeds 100 ms for 2 minutes on /api/update."
 
+      # Latency Alerts for /api/process
+      - alert: HighLatency_Process
+        expr: avg(rate(http_server_requests_seconds_sum{uri="/api/process"}[5m]) 
+              / rate(http_server_requests_seconds_count{uri="/api/process"}[5m])) * 1000 > 100
+        for: 2m
+        labels:
+          severity: warning
+          endpoint: process
+        annotations:
+          summary: "High latency on /api/process"
+          description: "Average latency {{ $value }} ms exceeds 100 ms for 2 minutes on /api/process."
+
+      # Error Rate Alerts for /api/hello
+      - alert: HighErrorRate_Hello
+        expr: rate(http_server_requests_seconds_count{status=~"5..", uri="/api/hello"}[5m]) 
+              / rate(http_server_requests_seconds_count{uri="/api/hello"}[5m]) * 100 > 5
+        for: 2m
+        labels:
+          severity: warning
+          endpoint: hello
+        annotations:
+          summary: "High error rate on /api/hello"
+          description: "Error rate {{ $value }}% exceeds 5% for 2 minutes on /api/hello."
+
+      # Error Rate Alerts for /api/update
+      - alert: HighErrorRate_Update
+        expr: rate(http_server_requests_seconds_count{status=~"5..", uri="/api/update"}[5m]) 
+              / rate(http_server_requests_seconds_count{uri="/api/update"}[5m]) * 100 > 5
+        for: 2m
+        labels:
+          severity: warning
+          endpoint: update
+        annotations:
+          summary: "High error rate on /api/update"
+          description: "Error rate {{ $value }}% exceeds 5% for 2 minutes on /api/update."
+
+      # Error Rate Alerts for /api/process
+      - alert: HighErrorRate_Process
+        expr: rate(http_server_requests_seconds_count{status=~"5..", uri="/api/process"}[5m]) 
+              / rate(http_server_requests_seconds_count{uri="/api/process"}[5m]) * 100 > 5
+        for: 2m
+        labels:
+          severity: warning
+          endpoint: process
+        annotations:
+          summary: "High error rate on /api/process"
+          description: "Error rate {{ $value }}% exceeds 5% for 2 minutes on /api/process."
+
+      # Queue Length Alert (Application-wide)
       - alert: HighQueueLength
         expr: sum(executor_queued_tasks{name="applicationTaskExecutor"}) > 50
         for: 2m
         labels:
           severity: warning
         annotations:
-          summary: "High queue length detected"
-          description: "Queue length {{ $value }} exceeds 50 for 2 minutes."
+          summary: "High thread pool queue length"
+          description: "Queue length {{ $value }} exceeds 50 for 2 minutes. Check endpoint-specific metrics for /api/hello, /api/update, or /api/process."

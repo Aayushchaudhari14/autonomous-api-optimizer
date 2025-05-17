@@ -1,3 +1,4 @@
+version: '3'
 services:
   prometheus:
     image: prom/prometheus:latest
@@ -15,7 +16,6 @@ services:
     networks:
       - app-network
 
-  # Other services (api-service, grafana, flask-anomaly-detection, alertmanager) remain unchanged
   api-service:
     build:
       context: .
@@ -31,6 +31,8 @@ services:
     container_name: grafana
     ports:
       - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
     networks:
       - app-network
 
@@ -61,3 +63,5 @@ networks:
 
 volumes:
   prometheus-data:
+  grafana-data:
+    driver: local
