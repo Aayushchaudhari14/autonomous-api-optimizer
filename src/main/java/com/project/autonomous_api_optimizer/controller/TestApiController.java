@@ -1,53 +1,69 @@
 package com.project.autonomous_api_optimizer.controller;
 
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
+import com.project.autonomous_api_optimizer.service.ApiService;
+import io.github.bucket4j.Bucket;
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
 public class TestApiController {
 
     private final MeterRegistry meterRegistry;
+    private final ApiService apiService;
+    private final Map<String, Bucket> rateLimiters;
 
-    public TestApiController(MeterRegistry meterRegistry) {
+    @Autowired
+    public TestApiController(MeterRegistry meterRegistry, ApiService apiService, Map<String, Bucket> rateLimiters) {
         this.meterRegistry = meterRegistry;
+        this.apiService = apiService;
+        this.rateLimiters = rateLimiters;
     }
 
     @GetMapping("/hello")
-    @Timed(value = "http_request_duration_seconds", description = "Time taken to process /api/hello")
+    @Timed(value = "http_server_requests_seconds", description = "Time taken to process /api/hello")
     public String hello() {
+        checkRateLimit("/api/hello");
         meterRegistry.counter("api.hello.counter").increment();
-        return "Hello from API!";
+        return apiService.processRequest("/api/hello", "hello");
     }
 
     @PostMapping("/process")
-    @Timed(value = "http_request_duration_seconds", description = "Time taken to process /api/process")
+    @Timed(value = "http_server_requests_seconds", description = "Time taken to process /api/process")
     public String process(@RequestBody String input) throws InterruptedException {
+        checkRateLimit("/api/process");
         meterRegistry.counter("api.process.counter").increment();
-        Thread.sleep(150); // Simulate 150ms delay
-        return "Processed: " + input;
+        Thread.sleep(150);
+        return apiService.processRequest("/api/process", input);
     }
 
     @PutMapping("/update")
-    @Timed(value = "http_request_duration_seconds", description = "Time taken to process /api/update")
+    @Timed(value = "http_server_requests_seconds", description = "Time taken to process /api/update")
     public String update(@RequestBody String data) throws InterruptedException {
+        checkRateLimit("/api/update");
         meterRegistry.counter("api.update.counter").increment();
-        Thread.sleep(500); // Simulate 500ms delay
-        return "Updated: " + data;
+        Thread.sleep(500);
+        return apiService.processRequest("/api/update", data);
     }
 
     @DeleteMapping("/delete")
-    @Timed(value = "http_request_duration_seconds", description = "Time taken to process /api/delete")
+    @Timed(value = "http_server_requests_seconds", description = "Time taken to process /api/delete")
     public String delete() {
+        checkRateLimit("/api/delete");
         meterRegistry.counter("api.delete.counter").increment();
-        return "Deleted";
+        return apiService.processRequest("/api/delete", "delete");
+    }
+
+    private void checkRateLimit(String endpoint) {
+        Bucket bucket = rateLimiters.get(endpoint);
+        if (!bucket.tryConsume(1)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded for " + endpoint);
+        }
     }
 }

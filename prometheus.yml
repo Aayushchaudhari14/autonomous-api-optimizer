@@ -1,6 +1,6 @@
 global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+  scrape_interval: 5s
+  evaluation_interval: 5s
 
 alerting:
   alertmanagers:
@@ -20,4 +20,4 @@ scrape_configs:
       - targets: ['flask-anomaly-detection:5000']
 
 rule_files:
-  - '/etc/prometheus/alerts.yml'
+  - 'alerts.yml'

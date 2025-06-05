@@ -1,7 +1,8 @@
-version: '3'
+version: '3.8'
+
 services:
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.53.0
     container_name: prometheus
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
@@ -14,7 +15,16 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--web.enable-lifecycle'
     networks:
-      - app-network
+      app-network:
+        aliases:
+          - prometheus
+    dns:
+      - 8.8.8.8  # Use Google's DNS to avoid 127.0.0.11
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   api-service:
     build:
@@ -25,9 +35,22 @@ services:
       - "8080:8080"
     networks:
       - app-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - SPRING_REDIS_PASSWORD=redis-password
+    command: ["sh", "-c", "sleep 15 && java -jar /app.jar"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   grafana:
-    image: grafana/grafana
+    image: grafana/grafana:11.1.0
     container_name: grafana
     ports:
       - "3000:3000"
@@ -35,9 +58,40 @@ services:
       - grafana-data:/var/lib/grafana
     networks:
       - app-network
+    depends_on:
+      - prometheus
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      app-network:
+        aliases:
+          - redis
+    command: redis-server --loglevel warning --requirepass redis-password
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "-a", "redis-password", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   flask-anomaly-detection:
-    build: ./flask-anomaly-detection
+    build:
+      context: ./flask-anomaly-detection
+      dockerfile: Dockerfile
     container_name: flask-anomaly-detection
     ports:
       - "5000:5000"
@@ -46,22 +100,40 @@ services:
     depends_on:
       - prometheus
       - api-service
+    environment:
+      - PROMETHEUS_URL=http://prometheus:9090
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   alertmanager:
-    image: prom/alertmanager:latest
+    image: prom/alertmanager:v0.27.0
     container_name: alertmanager
     volumes:
       - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
     ports:
       - "9093:9093"
     networks:
-      - app-network
+      app-network:
+        aliases:
+          - alertmanager
+    dns:
+      - 8.8.8.8  # Use Google's DNS
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   app-network:
     driver: bridge
+    name: app-network
 
 volumes:
   prometheus-data:
+    driver: local
   grafana-data:
     driver: local

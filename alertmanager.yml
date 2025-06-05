@@ -2,10 +2,14 @@ global:
   resolve_timeout: 5m
 
 route:
-  receiver: 'spring-boot-webhook'
+  receiver: 'webhook'
+  group_by: ['alertname', 'endpoint']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 1h
 
 receivers:
-  - name: 'spring-boot-webhook'
-    webhook_configs:
-      - url: 'http://api-service:8080/alert-webhook'
-        send_resolved: true
+- name: 'webhook'
+  webhook_configs:
+  - url: 'http://api-service:8080/alert-webhook'
+    send_resolved: true
