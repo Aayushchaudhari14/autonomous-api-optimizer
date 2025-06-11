@@ -1,14 +1,16 @@
 package com.project.autonomous_api_optimizer.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.project.autonomous_api_optimizer.model.FlaskResult;
 
 @Service
 public class OptimizationService {
@@ -20,52 +22,37 @@ public class OptimizationService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public void optimizeEndpoint(String endpoint, Map<String, Object> flaskResult) {
+    public void optimizeEndpoint(String endpoint, FlaskResult flaskResult) {
         logger.info("Starting optimization for endpoint: {}", endpoint);
         String redisKey = endpoint + ":" + endpoint.hashCode();
-        try {
-            Map<String, Object> settings = new HashMap<>();
-            Boolean isAnomaly = (Boolean) flaskResult.get("is_anomaly");
-            Double originalLatency = flaskResult.containsKey("latency") ? ((Number) flaskResult.get("latency")).doubleValue() : null;
 
-            if (originalLatency == null) {
-                logger.warn("No latency provided in flaskResult for endpoint: {}. Skipping optimization.", endpoint);
+        try {
+            Map<String, Double> metrics = flaskResult.getMetrics();
+
+            if (metrics == null || !metrics.containsKey("latency")) {
+                logger.warn("Latency is missing in metrics for endpoint: {}. Full metrics: {}", endpoint, metrics);
                 return;
             }
 
-            // Apply optimization based on anomaly
-            if (Boolean.TRUE.equals(isAnomaly)) {
+            Double latency = metrics.get("latency");
+            boolean isAnomaly = flaskResult.isAnomaly();
+
+            Map<String, Object> settings = new HashMap<>();
+            if (isAnomaly) {
                 settings.put("thread_pool_size", 20);
                 settings.put("cache_ttl", 300);
-                logger.info("Applied high-latency optimization for {}: cache_ttl=300s, thread_pool_size=20", endpoint);
+                logger.info("Anomaly detected. Applying optimized settings for {} (latency: {} ms)", endpoint, latency);
             } else {
                 settings.put("thread_pool_size", 10);
                 settings.put("cache_ttl", 60);
-                logger.info("Applied default optimization for {}: cache_ttl=60s, thread_pool_size=10", endpoint);
+                logger.info("No anomaly detected. Applying default settings for {} (latency: {} ms)", endpoint, latency);
             }
 
-            // Store optimized settings
             redisTemplate.opsForValue().set(redisKey, objectMapper.writeValueAsString(settings));
-            logger.debug("Stored optimization settings in Redis for key: {}", redisKey);
+            logger.info("Optimization completed and settings stored in Redis for endpoint: {}", endpoint);
 
-            // Simulate checking current latency (in practice, this could be delayed)
-            // For simplicity, assume Flask provides current latency post-optimization
-            Double currentLatency = flaskResult.containsKey("latency") ? ((Number) flaskResult.get("latency")).doubleValue() : originalLatency;
-
-            // Rollback logic: revert if currentLatency >= originalLatency
-            if (currentLatency >= originalLatency) {
-                logger.info("Rollback triggered for {}: currentLatency={}ms >= originalLatency={}ms", endpoint, currentLatency, originalLatency);
-                settings.put("thread_pool_size", 10);
-                settings.put("cache_ttl", 60);
-                redisTemplate.opsForValue().set(redisKey, objectMapper.writeValueAsString(settings));
-                logger.info("Rolled back to default settings for {}: cache_ttl=60s, thread_pool_size=10", endpoint);
-            } else {
-                logger.info("No rollback needed for {}: currentLatency={}ms < originalLatency={}ms", endpoint, currentLatency, originalLatency);
-            }
-
-            logger.info("Optimization completed successfully for endpoint: {}", endpoint);
         } catch (Exception e) {
-            logger.error("Error during optimization for endpoint: {}. Error: {}", endpoint, e.getMessage(), e);
+            logger.error("Error optimizing endpoint: {}: {}", endpoint, e.getMessage(), e);
         }
     }
 }

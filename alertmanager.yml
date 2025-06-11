@@ -1,15 +1,15 @@
 global:
-  resolve_timeout: 5m
+  resolve_timeout: 3m
 
 route:
-  receiver: 'webhook'
+  receiver: 'api_optimizer_webhook'
   group_by: ['alertname', 'endpoint']
-  group_wait: 30s
-  group_interval: 5m
-  repeat_interval: 1h
+  group_wait: 10s
+  group_interval: 2m
+  repeat_interval: 3m
 
 receivers:
-- name: 'webhook'
-  webhook_configs:
-  - url: 'http://api-service:8080/alert-webhook'
-    send_resolved: true
+  - name: 'api_optimizer_webhook'
+    webhook_configs:
+      - url: 'http://api-service:8080/alert-webhook'
+        send_resolved: true
