@@ -1,8 +1,13 @@
 package com.project.autonomous_api_optimizer.service;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
@@ -16,6 +21,10 @@ public class ApiService {
 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
+
+    @Autowired
+    @Qualifier("dynamicExecutor")
+    private ThreadPoolExecutor dynamicExecutor;
 
     public String processRequest(String endpoint, String input) {
         String cacheKey = endpoint + ":" + input.hashCode();
@@ -36,16 +45,16 @@ public class ApiService {
         }
 
         logger.info("Processing request for key: {}", cacheKey);
-        String result = simulateProcessing(endpoint, input);
         try {
+            Future<String> future = dynamicExecutor.submit(() -> simulateProcessing(endpoint, input));
+            String result = future.get(); // synchronous call
             redisTemplate.opsForValue().set(cacheKey, result);
             logger.debug("Cached result for key: {}", cacheKey);
-        } catch (RedisConnectionFailureException e) {
-            logRedisConnectionFailure(cacheKey, e);
+            return result;
         } catch (Exception e) {
-            logger.error("Unexpected error caching result for key: {}. Error: {}", cacheKey, e.getMessage(), e);
+            logger.error("Error during processing with executor: {}", e.getMessage(), e);
+            return "Processing failed for " + endpoint;
         }
-        return result;
     }
 
     public void invalidateCache(String endpoint) {
@@ -73,25 +82,41 @@ public class ApiService {
     }
 
     private String simulateProcessing(String endpoint, String input) {
+        try {
+            // Simulate latency
+            Thread.sleep(200);
+        } catch (InterruptedException ignored) {}
         return "Processed " + endpoint + ": " + input;
     }
 
     public String getFromCache(String endpoint, String input) {
-    String cacheKey = endpoint + ":" + input.hashCode();
-    try {
-        return (String) redisTemplate.opsForValue().get(cacheKey);
-    } catch (Exception e) {
-        return null;
-    }
-    }
-
-    public String processAndCache(String endpoint, String input) {
-        String result = simulateProcessing(endpoint, input);
         String cacheKey = endpoint + ":" + input.hashCode();
         try {
-            redisTemplate.opsForValue().set(cacheKey, result);
-        } catch (Exception ignored) {}
-        return result;
+            return (String) redisTemplate.opsForValue().get(cacheKey);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    // public String processAndCache(String endpoint, String input) {
+    //     String result = simulateProcessing(endpoint, input);
+    //     String cacheKey = endpoint + ":" + input.hashCode();
+    //     try {
+    //         redisTemplate.opsForValue().set(cacheKey, result);
+    //     } catch (Exception ignored) {}
+    //     return result;
+    // }
+
+
+    public CompletableFuture<String> processAndCacheAsync(String endpoint, String input) {
+        return CompletableFuture.supplyAsync(() -> {
+            String result = simulateProcessing(endpoint, input);
+            String cacheKey = endpoint + ":" + input.hashCode();
+            try {
+                redisTemplate.opsForValue().set(cacheKey, result);
+            } catch (Exception ignored) {}
+            return result;
+        }, dynamicExecutor);
     }
 
 }

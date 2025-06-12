@@ -15,6 +15,7 @@ import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Bucket4j;
 import io.github.bucket4j.Refill;
 
+
 @Configuration
 public class AppConfig {
 
@@ -28,12 +29,14 @@ public class AppConfig {
         return new ObjectMapper();
     }
 
+
+
     @Bean
     public Map<String, Bucket> rateLimiters() {
         Map<String, Bucket> limiters = new ConcurrentHashMap<>();
         String[] endpoints = {"/api/hello", "/api/process", "/api/update", "/api/delete"};
         for (String endpoint : endpoints) {
-            Bandwidth limit = Bandwidth.classic(100, Refill.greedy(100, Duration.ofSeconds(1)));
+            Bandwidth limit = Bandwidth.classic(1000, Refill.greedy(1000, Duration.ofSeconds(1)));
             limiters.put(endpoint, Bucket4j.builder().addLimit(limit).build());
         }
         return limiters;
