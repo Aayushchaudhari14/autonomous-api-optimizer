@@ -75,4 +75,23 @@ public class ApiService {
     private String simulateProcessing(String endpoint, String input) {
         return "Processed " + endpoint + ": " + input;
     }
+
+    public String getFromCache(String endpoint, String input) {
+    String cacheKey = endpoint + ":" + input.hashCode();
+    try {
+        return (String) redisTemplate.opsForValue().get(cacheKey);
+    } catch (Exception e) {
+        return null;
+    }
+    }
+
+    public String processAndCache(String endpoint, String input) {
+        String result = simulateProcessing(endpoint, input);
+        String cacheKey = endpoint + ":" + input.hashCode();
+        try {
+            redisTemplate.opsForValue().set(cacheKey, result);
+        } catch (Exception ignored) {}
+        return result;
+    }
+
 }

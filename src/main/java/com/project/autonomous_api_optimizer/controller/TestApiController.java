@@ -34,23 +34,51 @@ public class TestApiController {
         return apiService.processRequest("/api/hello", "hello");
     }
 
+    // @PostMapping("/process")
+    // @Timed(value = "http_server_requests_seconds", description = "Time taken to process /api/process")
+    // public String process(@RequestBody String input) throws InterruptedException {
+    //     checkRateLimit("/api/process");
+    //     meterRegistry.counter("api.process.counter").increment();
+    //     Thread.sleep(150);
+    //     return apiService.processRequest("/api/process", input);
+    // }
     @PostMapping("/process")
-    @Timed(value = "http_server_requests_seconds", description = "Time taken to process /api/process")
     public String process(@RequestBody String input) throws InterruptedException {
         checkRateLimit("/api/process");
         meterRegistry.counter("api.process.counter").increment();
-        Thread.sleep(150);
-        return apiService.processRequest("/api/process", input);
+
+        String cachedResult = apiService.getFromCache("/api/process", input);
+        if (cachedResult != null) {
+            return cachedResult;
+        }
+
+        Thread.sleep(150); // Simulate processing only on cache miss
+        return apiService.processAndCache("/api/process", input);
     }
 
+
+    // @PutMapping("/update")
+    // @Timed(value = "http_server_requests_seconds", description = "Time taken to process /api/update")
+    // public String update(@RequestBody String data) throws InterruptedException {
+    //     checkRateLimit("/api/update");
+    //     meterRegistry.counter("api.update.counter").increment();
+    //     Thread.sleep(500);
+    //     return apiService.processRequest("/api/update", data);
+    // }
     @PutMapping("/update")
-    @Timed(value = "http_server_requests_seconds", description = "Time taken to process /api/update")
     public String update(@RequestBody String data) throws InterruptedException {
         checkRateLimit("/api/update");
         meterRegistry.counter("api.update.counter").increment();
-        Thread.sleep(500);
-        return apiService.processRequest("/api/update", data);
+
+        String cachedResult = apiService.getFromCache("/api/update", data);
+        if (cachedResult != null) {
+            return cachedResult;
+        }
+
+        Thread.sleep(500); // Simulate delay only if no cache
+        return apiService.processAndCache("/api/update", data);
     }
+
 
     @DeleteMapping("/delete")
     @Timed(value = "http_server_requests_seconds", description = "Time taken to process /api/delete")
