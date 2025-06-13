@@ -82,10 +82,10 @@ public class ApiService {
     }
 
     private String simulateProcessing(String endpoint, String input) {
-        try {
-            // Simulate latency
-            Thread.sleep(200);
-        } catch (InterruptedException ignored) {}
+                // try {
+                //     // Simulate latency
+                //     Thread.sleep(200);
+                // } catch (InterruptedException ignored) {}
         return "Processed " + endpoint + ": " + input;
     }
 

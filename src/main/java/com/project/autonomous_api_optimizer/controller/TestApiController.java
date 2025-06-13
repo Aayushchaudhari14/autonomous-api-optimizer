@@ -4,6 +4,8 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -29,6 +31,7 @@ public class TestApiController {
     private final ApiService apiService;
     private final Map<String, Bucket> rateLimiters;
     private final ThreadPoolExecutor dynamicExecutor;
+    private static final Logger logger = LoggerFactory.getLogger(TestApiController.class);
 
     @Autowired
     public TestApiController(MeterRegistry meterRegistry,
@@ -57,14 +60,20 @@ public class TestApiController {
         checkRateLimit("/api/process");
         meterRegistry.counter("api.process.counter").increment();
 
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                Thread.sleep(150);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            return apiService.processRequest("/api/process", input);
-        }, dynamicExecutor);
+        String cachedResult = apiService.getFromCache("/api/process", input);
+        if (cachedResult != null) {
+            logger.info("Cache hit for /api/process with input hash: {}", input.hashCode());
+            return CompletableFuture.completedFuture(cachedResult);
+        } else {
+            logger.info("Cache miss for /api/process with input hash: {}", input.hashCode());
+        }
+
+        try {
+            Thread.sleep(150); // Simulate delay only on cache miss
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return apiService.processAndCacheAsync("/api/process", input);
     }
 
     @PutMapping("/update")
@@ -73,15 +82,22 @@ public class TestApiController {
         checkRateLimit("/api/update");
         meterRegistry.counter("api.update.counter").increment();
 
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                Thread.sleep(300);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            return apiService.processRequest("/api/update", data);
-        }, dynamicExecutor);
+        String cachedResult = apiService.getFromCache("/api/update", data);
+        if (cachedResult != null) {
+            logger.info("Cache hit for /api/update with input hash: {}", data.hashCode());
+            return CompletableFuture.completedFuture(cachedResult);
+        } else {
+            logger.info("Cache miss for /api/update with input hash: {}", data.hashCode());
+        }
+
+        try {
+            Thread.sleep(300); // Simulate delay only on cache miss
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return apiService.processAndCacheAsync("/api/update", data);
     }
+
 
     @DeleteMapping("/delete")
     @Timed(value = "http_server_requests_seconds", description = "Time taken to process /api/delete")
@@ -102,44 +118,5 @@ public class TestApiController {
 }
 
 
-// @PostMapping("/process")
-// @Timed(value = "http_server_requests_seconds", description = "Time taken to process /api/process")
-// public CompletableFuture<String> process(@RequestBody String input) {
-//     checkRateLimit("/api/process");
-//     meterRegistry.counter("api.process.counter").increment();
 
-//     String cachedResult = apiService.getFromCache("/api/process", input);
-//     if (cachedResult != null) {
-//         return CompletableFuture.completedFuture(cachedResult);
-//     }
 
-//     return CompletableFuture.supplyAsync(() -> {
-//         try {
-//             Thread.sleep(150); // Simulate delay only on cache miss
-//         } catch (InterruptedException e) {
-//             Thread.currentThread().interrupt();
-//         }
-//         return apiService.processAndCacheAsync("/api/process", input);
-//     }, dynamicExecutor);
-// }
-
-// @PutMapping("/update")
-// @Timed(value = "http_server_requests_seconds", description = "Time taken to process /api/update")
-// public CompletableFuture<String> update(@RequestBody String data) {
-//     checkRateLimit("/api/update");
-//     meterRegistry.counter("api.update.counter").increment();
-
-//     String cachedResult = apiService.getFromCache("/api/update", data);
-//     if (cachedResult != null) {
-//         return CompletableFuture.completedFuture(cachedResult);
-//     }
-
-//     return CompletableFuture.supplyAsync(() -> {
-//         try {
-//             Thread.sleep(500); // Simulate delay only on cache miss
-//         } catch (InterruptedException e) {
-//             Thread.currentThread().interrupt();
-//         }
-//         return apiService.processAndCacheAsync("/api/update", data);
-//     }, dynamicExecutor);
-// }
